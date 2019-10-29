@@ -1,0 +1,47 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: blackbox-exporter
+  namespace: monitoring
+  labels:
+    app: blackbox-exporter
+spec:
+  replicas: 1
+  strategy: 
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  progressDeadlineSeconds: 100
+  minReadySeconds: 5
+  revisionHistoryLimit: 10
+  template:
+    metadata:
+      labels:
+        app: blackbox-exporter
+    spec:
+      containers:
+      - name: blackbox
+        image: prom/blackbox-exporter:latest
+        args:
+          - '--config.file=/etc/blackbox-exporter/blackbox.yml'
+        imagePullPolicy: Always
+        ports:
+        - name: blackbox
+          protocol: TCP
+          containerPort: 9115
+        livenessProbe:
+          tcpSocket:
+            port: blackbox
+          initialDelaySeconds: 10
+          timeoutSeconds: 10
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 2
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/blackbox-exporter/
+      volumes:
+      - name: config-volume
+        configMap:
+          name: blackbox-configmap

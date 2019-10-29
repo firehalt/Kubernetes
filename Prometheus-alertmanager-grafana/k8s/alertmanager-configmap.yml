@@ -1,0 +1,39 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: alertmanager-config
+  namespace: monitoring
+data:
+  config.yml: |
+    global:
+      resolve_timeout: 5m
+      smtp_smarthost: 'smtp.126.com:25'
+      smtp_from: 'elkmonitor@126.co'
+      smtp_auth_username: 'elkmonitor@126.com'
+      smtp_auth_password: 'xxxx'
+    templates:
+    - '/etc/alertmanager-templates/*.tmpl'
+    route:
+      group_by: ['alertname', 'cluster', 'service']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 15m
+      receiver: dingtalk
+    receivers:
+    - name: 'AlertMail'
+      email_configs:
+      - to: 'xxxx@163.com'
+    - name: dingtalk
+      webhook_configs:
+      - send_resolved: false
+        # 需要运行插件 dingtalk-webhook.yaml，详情阅读 docs/guide/prometheus.md
+        url: http://webhook-dingtalk.monitoring.svc.cluster.local:8060/dingtalk/webhook1/send
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: alertmanager-templates
+  namespace: monitoring
+data:
+  empty.txt: |
+    # empty fileZZ
