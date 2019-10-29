@@ -1,12 +1,11 @@
 # Prometheus Kubernetes
+alertmanager+grafana+prometheus+dingtalk
 
 ## Apply
 
 Clone:
 
 ```bash
-git clone https://github.com/clemenko/prometheus
-cd prometheus/k8s
 kubectl apply -f .
 ```
 
@@ -19,3 +18,11 @@ kubectl get svc -n monitoring
 ```
 
 And login with `admin/Pa22word`.
+
+
+
+## PORT
+
+alertmanager：33003
+grafana ：33000
+prometheus：33001
