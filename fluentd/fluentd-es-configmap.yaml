@@ -1,0 +1,306 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: fluentd-es-config-v0.2.0
+  namespace: kube-system
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+data:
+  system.conf: |-
+    <system>
+      root_dir /tmp/fluentd-buffers/
+    </system>
+
+  containers.input.conf: |-
+    # 2016-02-17T00:04:05.931087621Z stdout F [info:2016-02-16T16:04:05.930-08:00] Some log text here
+    <source>
+      @id evolut-admin.log
+      @type tail
+      path /var/log/containers/evolut-admin*.log
+      pos_file /var/log/containers/evoluttest.log.pos
+      tag raw.kubernetes.evolut-admin.*
+      read_from_head true
+      <parse>
+        @type multi_format
+        <pattern>
+          format json
+          time_key time
+          time_format %Y-%m-%dT%H:%M:%S.%NZ
+        </pattern>
+        <pattern>
+          format /^(?<time>.+) (?<stream>stdout|stderr) [^ ]* (?<log>.*)$/
+          time_format %Y-%m-%dT%H:%M:%S.%N%:z
+        </pattern>
+      </parse>
+    </source>
+    <source>
+      @id evolut-user.log
+      @type tail
+      path /var/log/containers/evolut-user-*.log
+      pos_file /var/log/containers/evolut-user.log.pos
+      tag raw.kubernetes.evolut-user.*
+      read_from_head true
+      <parse>
+        @type multi_format
+        <pattern>
+          format json
+          time_key time
+          time_format %Y-%m-%dT%H:%M:%S.%NZ
+        </pattern>
+        <pattern>
+          format /^(?<time>.+) (?<stream>stdout|stderr) [^ ]* (?<log>.*)$/
+          time_format %Y-%m-%dT%H:%M:%S.%N%:z
+        </pattern>
+      </parse>
+    </source>
+
+    # Detect exceptions in the log output and forward them as one log entry.
+    <match raw.kubernetes.**>
+      @id raw.kubernetes
+      @type detect_exceptions
+      remove_tag_prefix raw
+      message log
+      stream stream
+      multiline_flush_interval 5
+      max_bytes 500000
+      max_lines 1000
+    </match>
+
+    # Concatenate multi-line logs
+    <filter **>
+      @id filter_concat
+      @type concat
+      key message
+      multiline_end_regexp /\n$/
+      separator ""
+    </filter>
+
+    # Enriches records with Kubernetes metadata
+    <filter kubernetes.**>
+      @id filter_kubernetes_metadata
+      @type kubernetes_metadata
+    </filter>
+
+    # Fixes json fields in Elasticsearch
+    <filter kubernetes.**>
+      @id filter_parser
+      @type parser
+      key_name log
+      reserve_data true
+      remove_key_name_field true
+      <parse>
+        @type multi_format
+        <pattern>
+          format json
+        </pattern>
+        <pattern>
+          format none
+        </pattern>
+      </parse>
+    </filter>
+
+  system.input.conf: |-
+
+    # Logs from systemd-journal for interesting services.
+    # TODO(random-liu): Remove this after cri container runtime rolls out.
+    # <source>
+      # @id journald-docker
+      # @type systemd
+      # matches [{ "_SYSTEMD_UNIT": "docker.service" }]
+      # <storage>
+        # @type local
+        # persistent true
+        # path /var/log/journald-docker.pos
+      # </storage>
+      # read_from_head true
+      # tag docker
+    # </source>
+
+    # <source>
+      # @id journald-container-runtime
+      # @type systemd
+      # matches [{ "_SYSTEMD_UNIT": "{{ fluentd_container_runtime_service }}.service" }]
+      # <storage>
+        # @type local
+        # persistent true
+        # path /var/log/journald-container-runtime.pos
+      # </storage>
+      # read_from_head true
+      # tag container-runtime
+    # </source>
+
+    # <source>
+      # @id journald-etcd
+      # @type systemd
+      # matches [{ "_SYSTEMD_UNIT": "etcd.service" }]
+      # <storage>
+        # @type local
+        # persistent true
+        # path /var/log/journald-etcd.pos
+      # </storage>
+      # read_from_head true
+      # tag etcd
+    # </source>
+
+    # <source>
+      # @id journald-kube-apiserver
+      # @type systemd
+      # matches [{ "_SYSTEMD_UNIT": "kube-apiserver.service" }]
+      # <storage>
+        # @type local
+        # persistent true
+        # path /var/log/journald-kube-apiserver.pos
+      # </storage>
+      # read_from_head true
+      # tag kube-apiserver
+    # </source>
+
+    # <source>
+      # @id journald-kube-controller-manager
+      # @type systemd
+      # matches [{ "_SYSTEMD_UNIT": "kube-controller-manager.service" }]
+      # <storage>
+        # @type local
+        # persistent true
+        # path /var/log/journald-kube-controller-manager.pos
+      # </storage>
+      # read_from_head true
+      # tag kube-controller-manager
+    # </source>
+
+    # <source>
+      # @id journald-kube-scheduler
+      # @type systemd
+      # matches [{ "_SYSTEMD_UNIT": "kube-scheduler.service" }]
+      # <storage>
+        # @type local
+        # persistent true
+        # path /var/log/journald-kube-scheduler.pos
+      # </storage>
+      # read_from_head true
+      # tag kube-scheduler
+    # </source>
+
+    # <source>
+      # @id journald-kubelet
+      # @type systemd
+      # matches [{ "_SYSTEMD_UNIT": "kubelet.service" }]
+      # <storage>
+        # @type local
+        # persistent true
+        # path /var/log/journald-kubelet.pos
+      # </storage>
+      # read_from_head true
+      # tag kubelet
+    # </source>
+
+    # <source>
+      # @id journald-kube-proxy
+      # @type systemd
+      # matches [{ "_SYSTEMD_UNIT": "kube-proxy.service" }]
+      # <storage>
+        # @type local
+        # persistent true
+        # path /var/log/journald-kube-proxy.pos
+      # </storage>
+      # read_from_head true
+      # tag kube-proxy
+    # </source>
+
+    # <source>
+      # @id journald-node-problem-detector
+      # @type systemd
+      # matches [{ "_SYSTEMD_UNIT": "node-problem-detector.service" }]
+      # <storage>
+        # @type local
+        # persistent true
+        # path /var/log/journald-node-problem-detector.pos
+      # </storage>
+      # read_from_head true
+      # tag node-problem-detector
+    # </source>
+
+    # <source>
+      # @id kernel
+      # @type systemd
+      # matches [{ "_TRANSPORT": "kernel" }]
+      # <storage>
+        # @type local
+        # persistent true
+        # path /var/log/kernel.pos
+      # </storage>
+      # <entry>
+        # fields_strip_underscores true
+        # fields_lowercase true
+      # </entry>
+      # read_from_head true
+      # tag kernel
+    # </source>
+
+  forward.input.conf: |-
+    # Takes the messages sent over TCP
+    <source>
+      @id forward
+      @type forward
+    </source>
+
+  # monitoring.conf: |-
+    # # Prometheus Exporter Plugin
+    # # input plugin that exports metrics
+    # <source>
+      # @id prometheus
+      # @type prometheus
+    # </source>
+    # <source>
+      # @id monitor_agent
+      # @type monitor_agent
+    # </source>
+    # # input plugin that collects metrics from MonitorAgent
+    # <source>
+      # @id prometheus_monitor
+      # @type prometheus_monitor
+      # <labels>
+        # host ${hostname}
+      # </labels>
+    # </source>
+    # # input plugin that collects metrics for output plugin
+    # <source>
+      # @id prometheus_output_monitor
+      # @type prometheus_output_monitor
+      # <labels>
+        # host ${hostname}
+      # </labels>
+    # </source>
+    # # input plugin that collects metrics for in_tail plugin
+    # <source>
+      # @id prometheus_tail_monitor
+      # @type prometheus_tail_monitor
+      # <labels>
+        # host ${hostname}
+      # </labels>
+    # </source>
+  output.conf: |-
+    <match **>
+      @id elasticsearch
+      @type elasticsearch
+      @log_level info
+      type_name _type
+      include_tag_key true
+      host 10.250.200.96
+      port 9200
+      logstash_format true
+      logstash_prefix ${tag}
+      <buffer>
+        @type file
+        path /var/log/fluentd-buffers/admin.system.buffer
+        flush_mode interval
+        retry_type exponential_backoff
+        flush_thread_count 2
+        flush_interval 5s
+        retry_forever
+        retry_max_interval 30
+        chunk_limit_size 2M
+        queue_limit_length 8
+        overflow_action block
+      </buffer>
+    </match>

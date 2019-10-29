@@ -1,0 +1,78 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: evolut-pdf
+  namespace: evolut
+  labels:
+    k8s-app: evolut-pdf
+
+spec:
+  replicas: 1
+  #滚动升级时70s后认为该pod就绪
+  revisionHistoryLimit: 3
+  minReadySeconds: 70
+  strategy:
+    ##由于replicas为3,则整个升级,pod个数在2-4个之间
+    rollingUpdate:
+      #滚动升级时会先启动1个pod    
+      maxSurge: 1 
+      #滚动升级时允许的最大Unavailable的pod个数      
+      maxUnavailable: 1 
+  selector:
+    matchLabels:
+      k8s-app: evolut-pdf
+  template:
+    metadata:
+      labels:
+        k8s-app: evolut-pdf
+    spec:
+      ##k8s将会给应用发送SIGTERM信号
+      terminationGracePeriodSeconds: 60 
+      containers:
+      - name: evolut-pdf
+        image: 10.250.200.200/k8s/evolut-frontend/evolut-pdf:V2.0-20
+        env:
+        - name: aliyun_logs_k8s-evolut-pdf
+          value: "stdout"
+        - name: aliyun_logs_mylog_format
+          value: json
+        - name: NODE_ENV
+          value: "development"
+        - name: uploadHost
+          value: "evolut-api-gateway"
+        - name: uploadPort
+          value: "7001"
+        resources:
+          # need more cpu upon initialization, therefore burstable class
+          limits:
+            memory:  512Mi
+            #cpu: 1000m
+          requests:
+            memory:  512Mi
+            #cpu: 100m
+        ports:
+        #容器的端口
+        - containerPort: 3000
+          #name: ui
+          protocol: TCP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: evolut-pdf
+  namespace: evolut
+  labels:
+    k8s-app: evolut-pdf
+
+spec:
+  type: NodePort
+  ports:
+  #集群IP的端口
+  - port: 3000
+    protocol: TCP
+    #容器的端口
+    targetPort: 3000
+    nodePort: 33012
+  selector:
+    k8s-app: evolut-pdf

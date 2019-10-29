@@ -1,0 +1,26 @@
+1.使用examples/pilot-elasticsearch-kubernetes.yml文件，如何elasticsearch设置了密码需要添加环境变量修改
+        env:
+          - name: "LOGGING_OUTPUT"
+            value: "elasticsearch"
+          - name: "ELASTICSEARCH_HOST"
+            value: "10.250.200.205"
+          - name: "ELASTICSEARCH_PORT"
+            value: "9200"
+         #- name: "ELASTICSEARCH_USER"
+         #   value: "elastic"
+         # - name: "ELASTICSEARCH_PASSWORD"
+         #   value: "12345678"
+
+
+2.服务需要使用log-pilot收集日志，必须要在文件里面添加下面的标签
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        effect: "NoSchedule"
+      containers:
+      - name: evolut-insurance
+        image: 10.250.200.200/k8s/evolut-backend/evolut-insurance:V2.0-43
+        env:
+        - name: aliyun_logs_k8s-evolut-insurance
+          value: "stdout"
+        - name: aliyun_logs_k8s-evolut-insurance_format
+          value: "json"
