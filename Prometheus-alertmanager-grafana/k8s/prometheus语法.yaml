@@ -1,0 +1,6 @@
+排除docker自带的的网口
+expr: round(irate (node_network_transmit_bytes_total{device!~'tap.*|veth.*|br.*|docker.*|virbr*|lo*|cni.*|flannel.*'}[5m]) *8 /1000000*10)/10 > 800
+       
+
+
+
