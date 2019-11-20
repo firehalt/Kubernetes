@@ -1,0 +1,263 @@
+    - name: Pods_xxj
+      rules:
+      - alert: 容器重启2分钟
+        expr: |
+          increase(kube_pod_container_status_restarts_total{namespace="$namespace",pod_template_hash="",pod="$Pod", container="$container"}[2m])   > 0
+        for: 2m
+        labels:
+          severity: 警告
+        annotations:
+          summary: "{{ $labels.pod_name }}'s容器重启"
+          description: "2分钟内{{ $labels.pod_name }} on {{ $labels.kubernetes_io_hostname }}容器重启."
+        ############
+      - alert: 容器启动错误( $container ) Errors
+        expr: |
+          sum(kube_pod_container_status_last_terminated_reason{namespace="$namespace",container="$container",pod_template_hash="",reason="Error"}[1m]) >0
+        for: 1m
+        labels:
+          severity: 警告
+        annotations:
+          summary: "{{ $labels.pod_name }}'s容器重启"
+          description: "1分钟内{{ $labels.pod_name }} on {{ $labels.kubernetes_io_hostname }}容器启动错误."
+        ########################
+      - alert: 容器内存溢出OOMkilled
+        expr: |
+          sum(kube_pod_container_status_last_terminated_reason{namespace="$namespace",container="$container",pod_template_hash="",reason="OOMKilled"}[1m]) > 0
+        for: 2m
+        labels:
+          severity: 警告
+        annotations:
+          summary: "{{ $labels.pod_name }}'s容器重启"
+          description: "1分钟内{{ $labels.pod_name }} on {{ $labels.kubernetes_io_hostname }}容器内存溢出."
+        ############
+      - alert: High Memory Usage of Container 
+        expr: | 
+          ((( sum(container_memory_usage_bytes{image!="",container_name!="POD", namespace!="kube-system"}) by (namespace,container_name,pod_name)  / sum(container_spec_memory_limit_bytes{image!="",container_name!="POD",namespace!="kube-system"}) by (namespace,container_name,pod_name) ) * 100 ) < +Inf ) > 30
+        for: 3m
+        labels:
+          severity: 警告
+          team: dev
+        annotations:
+          summary: "{{ $labels.pod_name }}'s内存使用率超过75%"
+          description: "2分钟内{{ $labels.pod_name }} on {{ $labels.kubernetes_io_hostname }}内存使用率超过75%."
+
+      - alert: High CPU Usage of Container 
+        expr: | 
+          ((sum(irate(container_cpu_usage_seconds_total{image!="",container_name!="POD", namespace!="kube-system"}[30s])) by (namespace,container_name,pod_name) / sum(container_spec_cpu_quota{image!="",container_name!="POD", namespace!="kube-system"} / container_spec_cpu_period{image!="",container_name!="POD", namespace!="kube-system"}) by (namespace,container_name,pod_name) ) * 100)  > 75
+        for: 3m
+        labels: 
+          team: dev
+          severity: 严重
+        annotations:
+          summary: "{{ $labels.pod_name }}'s cpu使用率超过75%"
+          description: "2分钟内{{ $labels.pod_name }} on {{ $labels.kubernetes_io_hostname }} CPU使用率超过75%."
+
+      - alert: 容器内存使用率超过90%
+        expr: (sum(container_memory_working_set_bytes{image!="",name=~"^k8s_.*", pod_name!=""}) by (pod_name)) / (sum (container_spec_memory_limit_bytes{image!="",name=~"^k8s_.*", pod_name!=""}) by (pod_name)) > 0.9 and (sum(container_memory_working_set_bytes{image!="",name=~"^k8s_.*", pod_name!=""}) by (pod_name)) / (sum (container_spec_memory_limit_bytes{image!="",name=~"^k8s_.*", pod_name!=""}) by (pod_name)) < 2
+        for: 2m
+        labels:
+          severity: 严重
+        annotations:
+          summary: "{{ $labels.pod_name }}'s内存超标"
+          description: "2分钟内{{ $labels.pod_name }} on {{ $labels.kubernetes_io_hostname }}内存使用超过90%."
+      - alert: 容器内存使用率超过90%新
+        expr: (sum(container_memory_usage_bytes{container_name="$container", namespace="$namespace"}) by (namespace,container_name) / sum(container_spec_memory_limit_bytes{container_name="$container", namespace="$namespace"}) by (namespace,container_name)) *100 >85
+        for: 2m
+        labels:
+          severity: 严重
+        annotations:
+          summary: "{{ $labels.pod_name }}'s内存超标"
+          description: "2分钟内{{ $labels.pod_name }} on {{ $labels.kubernetes_io_hostname }}内存使用超过90%."
+      - alert: 容器网络流量超过85%
+        expr: (sum(container_memory_usage_bytes{container_name="$container", namespace="$namespace"}) by (namespace,container_name) / sum(container_spec_memory_limit_bytes{container_name="$container", namespace="$namespace"}) by (namespace,container_name)) *100 >85
+        for: 2m
+        labels:
+          severity: 严重
+        annotations:
+          summary: "{{ $labels.pod_name }}'s内存超标"
+          description: "2分钟内{{ $labels.pod_name }} on {{ $labels.kubernetes_io_hostname }}容器网络超过85%."
+      - alert: IN方向网卡流量
+        expr: sum by (instance) (irate(node_network_receive_bytes_total[2m])) / 1024 / 1024 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "in方向网卡流量 (instance {{ $labels.instance }})"
+          description: "in方向网卡流量  (> 80 MB/s)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+      - alert: out方向网卡流量
+        expr: sum by (instance) (irate(node_network_transmit_bytes_total[2m])) / 1024 / 1024 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "out方向网卡流量超过80% (instance {{ $labels.instance }})"
+          description: "out方向网卡流量超过80% (> 80 MB/s)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+    - name: Nodes_xxj_1
+      rules: 
+      - alert: 节点idle超过40%
+        expr: sum(irate(node_cpu_seconds_total{mode="idle",instance=~'$node'}[5m])) or sum(irate(node_cpu{mode="idle",instance=~'$node'}[5m])) >40
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "(instance {{ $labels.instance }})"
+          description: "节点idle超过40%\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: 节点iowait超过60%
+        expr: sum(irate(node_cpu_seconds_total{mode="iowait",instance=~'$node'}[5m])) or sum(irate(node_cpu{mode="iowait",instance=~'$node'}[5m])) >60
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "(instance {{ $labels.instance }})"
+          description: "节点iowait超过60%\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: 节点load average超过4
+        expr: node_load1{instance=~"$node"} >4
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "(instance {{ $labels.instance }})"
+          description: "节点load average超过4\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: 节点load average超过4
+        expr: node_load5{instance=~"$node"} >4
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "(instance {{ $labels.instance }})"
+          description: "节点load average超过4\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: 节点硬盘空间超过80%
+        expr: 100.0 - 100 * (node_filesystem_avail_bytes{instance=~'$node',device !~'tmpfs',device!~'by-uuid'} / node_filesystem_size_bytes{instance=~'$node',device !~'tmpfs',device!~'by-uuid'}) or 100.0 - 100 * (node_filesystem_avail{instance=~'$node',device !~'tmpfs',device!~'by-uuid'} / node_filesystem_size{instance=~'$node',device !~'tmpfs',device!~'by-uuid'}) >80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "(instance {{ $labels.instance }})"
+          description: "节点硬盘空间超过80%\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: 每个磁盘利用率大于40%
+        expr: irate(node_disk_io_time_seconds_total{instance=~"$node"}[5m])*100 or irate(node_disk_io_time_ms{instance=~"$node"}[5m])/10 >40
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "(instance {{ $labels.instance }})"
+          description: "每个磁盘利用率大于40%\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: 磁盘使用容量大于70%
+        expr: (node_filesystem_size_bytes{instance=~"$node",job=~"$job",device!~'rootfs'} - node_filesystem_avail_bytes{instance=~"$node",job=~"$job",device!~'rootfs'})/1024/1024/1024 >70
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "(instance {{ $labels.instance }})"
+          description: "磁盘使用容量大于70%\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: 磁盘读IO大于40%
+        expr: irate(node_disk_reads_completed_total{instance=~'$node'}[5m]) or irate(node_disk_reads_completed{instance=~'$node'}[5m])*10 >40
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "(instance {{ $labels.instance }})"
+          description: "磁盘读IO大于40%\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: 磁盘写IO大于40%
+        expr: irate(node_disk_writes_completed_total{instance=~'$node'}[5m]) or irate(node_disk_writes_completed{instance=~'$node'}[5m])*10 >40
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "(instance {{ $labels.instance }})"
+          description: "磁盘写IO大于40%\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: 磁盘吞吐量写大于40M/s
+        expr: irate(node_disk_written_bytes_total{instance=~'$node'}[5m]) or irate(node_disk_sectors_written{instance=~'$node'}[5m]) * 512/1024/1024 >40
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "(instance {{ $labels.instance }})"
+          description: "磁盘吞吐量写大于40M/s\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: 磁盘吞吐量读大于40M/s
+        expr: irate(node_disk_read_bytes_total{instance=~'$node'}[5m]) or irate(node_disk_sectors_read{instance=~'$node'}[5m]) * 512/1024/1024 >40
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "(instance {{ $labels.instance }})"
+          description: "磁盘吞吐量读大于40M/s\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: 磁盘队列长度40M/s
+        expr: node_disk_io_now{instance=~"$node"} >40
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "(instance {{ $labels.instance }})"
+          description: "磁盘吞吐量读大于40M/s\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: 磁盘上下文切换大于40M/s
+        expr: irate(node_context_switches_total{instance=~"$node"}[5m])/1024/1024  or irate(node_context_switches{instance=~"$node"}[5m])/1024/1024 >40
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "(instance {{ $labels.instance }})"
+          description: "磁盘上下文切换大于40M/s\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: 节点网络receive流量大于50M/s
+        expr: irate(node_network_receive_bytes_total{instance=~'$node',device !~'tap.*|veth.*|br.*|docker.*|virbr*|lo*|cni.*|flannel.*'}[5m])*8/2014/1024 or irate(node_network_receive_bytes{instance=~'$node',device !~'tap.*|veth.*|br.*|docker.*|virbr*|lo*|cni.*|flannel.*'}[5m])*8/2014/1024 >50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "(instance {{ $labels.instance }})"
+          description: "节点网络receive流量大于50M/\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: 节点网络transmit流量大于50M/s
+        expr: irate(node_network_transmit_bytes_total{instance=~'$node',device !~'tap.*|veth.*|br.*|docker.*|virbr*|lo*|cni.*|flannel.*'}[5m])*8/2014/1024 or irate(node_network_transmit_bytes{instance=~'$node',device !~'tap.*|veth.*|br.*|docker.*|virbr*|lo*|cni.*|flannel.*'}[5m])*8/2014/1024 >50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "(instance {{ $labels.instance }})"
+          description: "节点网络transmit流量大于50M/\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: 节点TCP连接数大于2500
+        expr: node_netstat_Tcp_CurrEstab{instance=~'$node'} >2500
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "(instance {{ $labels.instance }})"
+          description: "节点TCP连接数大于2500\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: 节点连接跟踪nf_conntrack大于30M/s
+        expr: (node_nf_conntrack_entries_limit{instance=~"$node"} - node_nf_conntrack_entries{instance=~"$node"})/1024/1024 >30
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "(instance {{ $labels.instance }})"
+          description: "节点连接跟踪nf_conntrack大于30M/s\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+    - name: Deployment
+      rules:
+      - alert: Deployment at 0 Replicas
+        expr: |
+          sum(kube_deployment_status_replicas_available{deployment=~"^$Deployment$",pod_template_hash=""}) / sum(kube_deployment_status_replicas{deployment=~"^$Deployment$",pod_template_hash=""})   < 0
+        for: 2m
+        labels:
+          severity: 警告
+        annotations:
+          summary: "Deployment {{$labels.deployment}}"
+          description: "Deployment {{$labels.deployment}} in {{$labels.namespace}} is currently having no pods running"
+          
+      - alert: HPA Scaling Limited  
+        annotations: 
+          summary: HPA named {{$labels.hpa}} in {{$labels.namespace}} namespace has reached scaling limited state
+        expr: | 
+          (sum(kube_hpa_status_condition{condition="ScalingLimited",status="true"}) by (hpa,namespace)) == 1
+        for: 1m
+        labels: 
+          severity: 警告
+
+      - alert: HPA at MaxCapacity 
+        annotations: 
+          summary: HPA named {{$labels.hpa}} in {{$labels.namespace}} namespace is running at Max Capacity
+        expr: | 
+          ((sum(kube_hpa_spec_max_replicas) by (hpa,namespace)) - (sum(kube_hpa_status_current_replicas) by (hpa,namespace))) == 0
+        for: 1m
+        labels: 
+          severity: 警告
+                       
