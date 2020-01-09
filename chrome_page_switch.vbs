@@ -14,3 +14,6 @@ Else
         count=0
 End If
 loop
+
+
+'使用#How to use? cmd:>wscript c:\chrome_page_switch.vbs
